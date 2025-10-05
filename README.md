@@ -351,6 +351,44 @@ git push -u origin main
 
 **Ready to deploy?** → Read [`DEPLOYMENT_README.md`](./DEPLOYMENT_README.md)
 
+## 🚀 Deployment Options
+
+This project can be deployed to multiple platforms:
+
+### ⭐ Railway (Recommended)
+- ✅ Full feature support
+- ✅ Free tier available ($5 credit)
+- ✅ Simple one-command deployment
+```bash
+railway login && railway up
+```
+See: `railway.json` and `DEPLOYMENT_GUIDE.md`
+
+### 🔧 Render
+- ✅ Full feature support
+- ✅ Free tier (750 hours/month)
+- ✅ Background workers
+```
+Deploy via web UI
+```
+See: `render.yaml` and `DEPLOYMENT_GUIDE.md`
+
+### ⚠️ Netlify (Hybrid Mode - Limited Features)
+- ⚠️ Serverless functions only
+- ⚠️ No persistent processes (60% functionality)
+- ⚠️ Requires webhooks + external cron
+```bash
+netlify deploy --prod
+```
+See: `NETLIFY_QUICK_START.md` and `NETLIFY_DEPLOYMENT.md`
+
+**Not sure which to choose?** Run:
+```bash
+node choose-platform.js
+```
+
+For detailed platform comparison, see: `PLATFORM_COMPARISON_DETAILED.md`
+
 ---
 
 ## Support

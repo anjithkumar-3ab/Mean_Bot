@@ -113,6 +113,10 @@ _Attendance Automation System_`;
             await this.sendHelpMessage(chatId);
             break;
           
+          case 'edit_accounts':
+            await this.handleEditAccountsCommand(chatId);
+            break;
+          
           case 'changepassword':
             await this.handleChangePasswordCommand(chatId);
             break;
@@ -147,6 +151,20 @@ _Attendance Automation System_`;
             } else if (data.startsWith('changepass_')) {
               const studentId = data.replace('changepass_', '');
               await this.startPasswordChange(chatId, studentId);
+            } else if (data.startsWith('remove_')) {
+              const studentId = data.replace('remove_', '');
+              await this.handleRemoveAccountCommand(chatId, studentId);
+            } else if (data.startsWith('confirmremove_')) {
+              const studentId = data.replace('confirmremove_', '');
+              await this.confirmRemoveAccount(chatId, studentId);
+            } else if (data.startsWith('cancelremove_')) {
+              await this.bot.sendMessage(chatId, 
+                `✅ *Removal Cancelled*\n\nNo changes were made to your accounts.`,
+                { 
+                  parse_mode: 'Markdown',
+                  reply_markup: this.getMainMenuKeyboard()
+                }
+              );
             }
             break;
         }
@@ -647,6 +665,11 @@ Simply click the buttons below or use commands:
 • View all registered student accounts
 • See last check dates and status
 
+*✏️ Edit/Remove Accounts*
+• Click "Edit/Remove Accounts" from My Accounts
+• Remove unwanted student accounts
+• Unlink accounts from your Telegram
+
 *🔐 Change Password*
 • Click "Change Password" button or send /changepass
 • Update your MITS IMS password
@@ -662,6 +685,7 @@ Simply click the buttons below or use commands:
 ✅ Attendance suggestions
 ✅ Secure password encryption
 ✅ Easy password updates
+✅ Account management (add/remove)
 
 ━━━━━━━━━━━━━━━━━━━━━
 Need more help? Contact your administrator.`;
@@ -843,6 +867,7 @@ Need more help? Contact your administrator.`;
         inline_keyboard: [
           [{ text: '📊 Check Attendance', callback_data: 'check' }],
           [{ text: '➕ Add Another Account', callback_data: 'register' }],
+          [{ text: '✏️ Edit/Remove Accounts', callback_data: 'edit_accounts' }],
           [{ text: '🏠 Main Menu', callback_data: 'help' }]
         ]
       };
@@ -1137,6 +1162,216 @@ Need more help? Contact your administrator.`;
       await this.bot.sendMessage(chatId, 
         `❌ *Password Change Error*\n\n${error.message}\n\n` +
         `Please try again.`,
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: this.getMainMenuKeyboard()
+        }
+      );
+    }
+  }
+
+  /**
+   * Handle edit accounts command
+   */
+  async handleEditAccountsCommand(chatId) {
+    try {
+      const Student = require('../models/Student');
+      
+      // Find all students linked to this chat ID
+      const students = await Student.find({ 
+        telegramChatIds: chatId.toString() 
+      });
+
+      if (students.length === 0) {
+        const keyboard = {
+          inline_keyboard: [
+            [{ text: '📝 Register Account', callback_data: 'register' }],
+            [{ text: '🏠 Main Menu', callback_data: 'help' }]
+          ]
+        };
+
+        await this.bot.sendMessage(chatId, 
+          `❌ *No Accounts Found*\n\n` +
+          `You haven't registered any student accounts yet.\n\n` +
+          `Click the button below to register your first account!`,
+          { 
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+          }
+        );
+        return;
+      }
+
+      let message = `✏️ *Edit/Remove Accounts*\n\n`;
+      message += `Total: ${students.length} account(s)\n\n`;
+      message += `Select an account to remove:\n\n`;
+      
+      students.forEach((student, index) => {
+        const status = student.isActive ? '✅' : '❌';
+        message += `${index + 1}. ${status} *${student.studentId}* - ${student.name}\n`;
+      });
+      
+      message += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
+      message += `⚠️ *Warning:* Removing an account will unlink it from your Telegram.\n`;
+      message += `Click a button below to remove:`;
+
+      // Create buttons for each student
+      const buttons = students.map(student => [{
+        text: `🗑️ Remove ${student.studentId}`,
+        callback_data: `remove_${student.studentId}`
+      }]);
+      
+      // Add back button
+      buttons.push([{ text: '◀️ Back to My Accounts', callback_data: 'myaccounts' }]);
+      buttons.push([{ text: '🏠 Main Menu', callback_data: 'help' }]);
+
+      await this.bot.sendMessage(chatId, message, { 
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: buttons }
+      });
+
+    } catch (error) {
+      console.error('Error handling edit accounts:', error);
+      await this.bot.sendMessage(chatId, 
+        `❌ *Error*\n\nFailed to load accounts: ${error.message}`,
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: this.getMainMenuKeyboard()
+        }
+      );
+    }
+  }
+
+  /**
+   * Handle remove account command
+   */
+  async handleRemoveAccountCommand(chatId, studentId) {
+    try {
+      const Student = require('../models/Student');
+      
+      // Find student and verify this chat ID has access
+      const student = await Student.findOne({ 
+        studentId,
+        telegramChatIds: chatId.toString() 
+      });
+
+      if (!student) {
+        await this.bot.sendMessage(chatId, 
+          `❌ *Access Denied*\n\nStudent ID \`${studentId}\` is not linked to your Telegram account.`,
+          { 
+            parse_mode: 'Markdown',
+            reply_markup: this.getMainMenuKeyboard()
+          }
+        );
+        return;
+      }
+
+      // Show confirmation dialog
+      const message = `⚠️ *Confirm Removal*\n\n` +
+        `Are you sure you want to remove this account?\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━\n` +
+        `👤 Student ID: \`${student.studentId}\`\n` +
+        `📝 Name: ${student.name}\n` +
+        `━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `This will:\n` +
+        `• Unlink the account from your Telegram\n` +
+        `• Stop attendance notifications for this account\n` +
+        `• You can re-register anytime\n\n` +
+        `*This action cannot be undone!*`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: '✅ Yes, Remove It', callback_data: `confirmremove_${studentId}` },
+            { text: '❌ No, Cancel', callback_data: `cancelremove_${studentId}` }
+          ],
+          [{ text: '◀️ Back', callback_data: 'edit_accounts' }]
+        ]
+      };
+
+      await this.bot.sendMessage(chatId, message, { 
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+      });
+
+    } catch (error) {
+      console.error('Error handling remove account:', error);
+      await this.bot.sendMessage(chatId, 
+        `❌ *Error*\n\nFailed to process removal: ${error.message}`,
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: this.getMainMenuKeyboard()
+        }
+      );
+    }
+  }
+
+  /**
+   * Confirm and remove account
+   */
+  async confirmRemoveAccount(chatId, studentId) {
+    try {
+      const Student = require('../models/Student');
+      
+      // Find student and verify this chat ID has access
+      const student = await Student.findOne({ 
+        studentId,
+        telegramChatIds: chatId.toString() 
+      });
+
+      if (!student) {
+        await this.bot.sendMessage(chatId, 
+          `❌ *Error*\n\nStudent account not found or access denied.`,
+          { 
+            parse_mode: 'Markdown',
+            reply_markup: this.getMainMenuKeyboard()
+          }
+        );
+        return;
+      }
+
+      // Remove chat ID from student's telegram chat IDs array
+      student.telegramChatIds = student.telegramChatIds.filter(
+        id => id !== chatId.toString()
+      );
+
+      // If this was the legacy chat ID, clear it
+      if (student.telegramChatId === chatId.toString()) {
+        student.telegramChatId = student.telegramChatIds[0] || '';
+      }
+
+      // If no more chat IDs, deactivate the account
+      if (student.telegramChatIds.length === 0) {
+        student.isActive = false;
+        student.telegramChatId = '';
+      }
+
+      await student.save();
+
+      await this.bot.sendMessage(chatId, 
+        `✅ *Account Removed Successfully!*\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━\n` +
+        `👤 Student ID: \`${studentId}\`\n` +
+        `📝 Name: ${student.name}\n` +
+        `━━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `This account has been unlinked from your Telegram.\n\n` +
+        `${student.telegramChatIds.length === 0 ? '⚠️ Account has been deactivated as no Telegram connections remain.\n\n' : ''}` +
+        `*What's next?*\n` +
+        `• You can re-register anytime with /register\n` +
+        `• Use /myaccounts to see remaining accounts`,
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: this.getMainMenuKeyboard()
+        }
+      );
+
+      console.log(`✅ Account ${studentId} removed from chat ID ${chatId}`);
+
+    } catch (error) {
+      console.error('Error confirming account removal:', error);
+      await this.bot.sendMessage(chatId, 
+        `❌ *Removal Failed*\n\nAn error occurred: ${error.message}\n\n` +
+        `Please try again or contact support.`,
         { 
           parse_mode: 'Markdown',
           reply_markup: this.getMainMenuKeyboard()

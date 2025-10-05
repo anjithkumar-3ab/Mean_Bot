@@ -1,0 +1,44 @@
+# Netlify Configuration for Attendance Automation System
+# Note: This is a HYBRID deployment approach
+
+[build]
+  # Build command (if you have a build step)
+  command = "npm install"
+  # Directory with static files
+  publish = "public"
+  # Serverless functions directory
+  functions = "netlify/functions"
+
+# Redirect API calls to serverless functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[functions]
+  # Increase function timeout (max 10 seconds on free plan, 26 seconds on paid)
+  timeout = 10
+  # Include node_modules in functions
+  included_files = ["config/**", "models/**", "utils/**", "services/**"]
+
+# Environment variables (set these in Netlify Dashboard)
+# MONGODB_URI - Your MongoDB connection string (use MongoDB Atlas)
+# TELEGRAM_BOT_TOKEN - Your Telegram bot token
+# JWT_SECRET - Your JWT secret
+# ENCRYPTION_KEY - Your encryption key
+
+# NOTE: Netlify serverless functions have limitations:
+# 1. No persistent processes (cron jobs need external service)
+# 2. Telegram polling won't work (use webhooks instead)
+# 3. 10-second execution limit on free tier
+# 
+# For full functionality, consider:
+# - Railway (recommended for this project)
+# - Render
+# - Heroku
+# - DigitalOcean App Platform
