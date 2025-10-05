@@ -1,0 +1,68 @@
+name: Manual Deploy to Azure
+
+# This workflow can only be triggered manually from GitHub Actions tab
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+      run-tests:
+        description: 'Run tests before deployment'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  AZURE_WEBAPP_NAME: your-app-name    # Set this to your Azure Web App name
+  NODE_VERSION: '18.x'
+
+jobs:
+  deploy:
+    name: Manual Deployment
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 🛎️ Checkout repository
+      uses: actions/checkout@v4
+
+    - name: 🟢 Set up Node.js ${{ env.NODE_VERSION }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: 📦 Install dependencies
+      run: npm ci
+
+    - name: 🧪 Run tests
+      if: ${{ github.event.inputs.run-tests == 'true' }}
+      run: npm run test --if-present
+      continue-on-error: true
+
+    - name: 📊 Prepare deployment
+      run: |
+        echo "Deploying to: ${{ github.event.inputs.environment }}"
+        rm -rf node_modules
+        npm ci --only=production
+
+    - name: 🚀 Deploy to Azure
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: .
+
+    - name: ✅ Deployment Summary
+      run: |
+        echo "### Deployment Successful! 🎉" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Environment**: ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Tests Run**: ${{ github.event.inputs.run-tests }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Deployed By**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY

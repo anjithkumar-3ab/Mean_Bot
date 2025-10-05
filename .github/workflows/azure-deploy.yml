@@ -1,0 +1,67 @@
+name: Deploy to Azure App Service
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: your-app-name    # Set this to your Azure Web App name
+  AZURE_WEBAPP_PACKAGE_PATH: '.'      # Set this to the path to your web app project
+  NODE_VERSION: '18.x'                # Set this to the node version to use
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+
+    steps:
+    - name: 🛎️ Checkout repository
+      uses: actions/checkout@v4
+
+    - name: 🟢 Set up Node.js ${{ env.NODE_VERSION }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: 📦 Install dependencies
+      run: |
+        npm ci
+        npm run build --if-present
+
+    - name: 🧪 Run tests (if available)
+      run: |
+        npm run test --if-present
+      continue-on-error: true
+
+    - name: 📊 Create deployment package
+      run: |
+        # Remove dev dependencies and unnecessary files to reduce package size
+        rm -rf node_modules
+        npm ci --only=production
+        
+        # Create a zip file for deployment
+        zip -r deploy.zip . -x "*.git*" "*.env*" "screenshots/*" "*.md" "ADMIN_BOT_SETUP.md" "README.md"
+
+    - name: 🚀 Deploy to Azure Web App
+      id: deploy-to-webapp
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: ./deploy.zip
+
+    - name: 🎉 Deployment complete
+      run: |
+        echo "✅ Application deployed successfully!"
+        echo "🌐 URL: ${{ steps.deploy-to-webapp.outputs.webapp-url }}"
+
+    - name: 🧹 Cleanup
+      if: always()
+      run: |
+        rm -f deploy.zip

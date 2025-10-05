@@ -13,6 +13,15 @@ class AttendanceService {
     if (this.telegramService && !this.telegramService.attendanceService) {
       this.telegramService.setAttendanceService(this);
     }
+    // Initialize scheduler property
+    this.scheduler = null;
+  }
+  
+  /**
+   * Set the scheduler instance
+   */
+  setScheduler(scheduler) {
+    this.scheduler = scheduler;
   }
 
   /**

@@ -6,6 +6,12 @@ package-lock.json
 .env
 .env.local
 .env.production
+.env.azure
+
+# Azure deployment files
+.deployment
+deploy.zip
+*.publishsettings
 
 # Logs
 logs/
@@ -18,6 +24,9 @@ yarn-error.log*
 screenshots/
 debug/
 .puppeteer_cache/
+
+# Runtime generated files
+server-heartbeat.json
 
 # OS files
 .DS_Store
