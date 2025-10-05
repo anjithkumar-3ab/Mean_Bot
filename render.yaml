@@ -1,0 +1,29 @@
+# Render Blueprint for Attendance Automation System
+services:
+  - type: web
+    name: attendance-automation
+    env: node
+    region: oregon # Change to your preferred region
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: MONGODB_URI
+        sync: false # Set this in Render dashboard
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASSWORD
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: ATTENDANCE_CHECK_TIME
+        value: "08:00"
